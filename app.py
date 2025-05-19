@@ -184,6 +184,160 @@ def calculate_text_height(text, font_size=20, line_spacing=10):
     lines = text.split("\n")
     return len(lines) * font_size + (len(lines) - 1) * line_spacing
 
+# def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_path, audio_duration, output_path, width=592, height=800):
+#     try:
+#         font_regular = "fonts/Roboto-VariableFont_wdth_wght.ttf"
+#         font_bold = "fonts/Roboto_Condensed-Bold.ttf"
+#         font_bold_italic = "fonts/Roboto_Condensed-BoldItalic.ttf"
+#         filter_complex = []
+#         inputs = [video_path]
+#         audio_filters = []
+
+#         # Xử lý phụ đề
+#         for i, script in enumerate(scripts):
+#             text = script.get("text", "")
+#             duration = script.get("duration", 1)
+#             start = script.get("start", sum(s.get("duration", 0) for s in scripts[:i]))
+#             end = start + duration
+
+#             style = script.get("style", {})
+#             position = style.get("position", "bottom")
+#             font_size = style.get("fontSize", 20)
+#             font_color = style.get("fontColor", "white")
+#             bg_color = style.get("backgroundColor", "black@0.5")
+#             font_style = style.get("fontStyle", [])
+#             alignment = style.get("alignment", "center")
+#             shadow = style.get("shadow", {})
+#             outline = style.get("outline", {})
+#             width_text = style.get("width", width)
+
+#             # Chọn font
+#             if "bold" in font_style and "italic" in font_style:
+#                 font_path = font_bold_italic
+#             elif "bold" in font_style:
+#                 font_path = font_bold
+#             else:
+#                 font_path = font_regular
+
+#             wrapped = wrap_text(text, width_text, font_path, font_size)
+#             wrapped = wrapped.replace(":", "\\:").replace("'", "\\'")
+
+#             if position == "top":
+#                 y = 30
+#             elif position == "middle":
+#                 y = "(h-text_h)/2"
+#             else:  # bottom
+#                 y = "h-text_h-30"
+
+#             x = "(w-text_w)/2" if alignment == "center" else "10" if alignment == "left" else "w-text_w-10"
+
+#             shadow_str = ""
+#             if shadow:
+#                 shadow_color = shadow.get("color", "black")
+#                 shadow_x = shadow.get("offsetX", 2)
+#                 shadow_y = shadow.get("offsetY", 2)
+#                 shadow_str = f":shadowcolor={shadow_color}:shadowx={shadow_x}:shadowy={shadow_y}"
+
+#             outline_str = ""
+#             if outline:
+#                 outline_color = outline.get("color", "black")
+#                 outline_width = outline.get("width", 2)
+#                 outline_str = f":bordercolor={outline_color}:borderw={outline_width}"
+
+#             filter_complex.append(
+#                 f"drawtext=text='{wrapped}':fontsize={font_size}:fontcolor={font_color}:x={x}:y={y}:"
+#                 f"fontfile='{font_path}':box=1:boxcolor={bg_color}:boxborderw=10:line_spacing=10:"
+#                 f"enable='between(t,{start},{end})'{shadow_str}{outline_str}"
+#             )
+
+#         # Xử lý nhãn dán
+#         for i, sticker in enumerate(stickers):
+#             sticker_path = sticker.get("file_path")
+#             print("Nhãn dán được thêm: ", sticker_path)
+#             if not os.path.exists(sticker_path):
+#                 return f"❌ File nhãn dán {sticker_path} không tồn tại!"
+
+#             duration = sticker.get("duration", 1)
+#             start = sticker.get("start", sum(s.get("duration", 0) for s in stickers[:i]))
+#             end = start + duration
+#             sticker_width = sticker.get("width", 100)
+#             sticker_height = sticker.get("height", 100)
+#             position = sticker.get("position", {"x": 0, "y": 0})
+#             rotate = sticker.get("rotate", 0)
+
+#             x = position.get("x", 0)
+#             y = position.get("y", 0)
+
+#             inputs.append(sticker_path)
+#             input_idx = len(inputs) - 1
+
+#             scale_filter = f"scale={sticker_width}:{sticker_height}"
+#             if rotate:
+#                 scale_filter += f",rotate={rotate}*PI/180"
+
+#             filter_complex.append(
+#                 f"[{input_idx}:v]{scale_filter}[sticker_{i}];"
+#                 f"[0:v][sticker_{i}]overlay={x}:{y}:enable='between(t,{start},{end})'"
+#             )
+
+#         # Xử lý audio
+#         if audio_path:
+#             inputs.append(audio_path)
+#             audio_input_idx = len(inputs) - 1
+#             if audio_duration:
+#                 audio_filters.append(f"[{audio_input_idx}:a]atrim=duration={audio_duration}[audio]")
+#             else:
+#                 audio_filters.append(f"[{audio_input_idx}:a]anull[audio]")
+
+#         filter_complex_str = ",".join(filter_complex) if filter_complex else ""
+
+#         command = [
+#             "ffmpeg",
+#             "-y",
+#         ]
+#         for input_file in inputs:
+#             command += ["-i", input_file]
+
+#         command += [
+#             "-filter_complex", filter_complex_str + ";" + ";".join(audio_filters) if audio_filters else filter_complex_str,
+#             "-c:v", "libx264",
+#             "-pix_fmt", "yuv420p",
+#             "-crf", "20",
+#             "-preset", "veryfast",
+#         ]
+
+#         # Xử lý audio output
+#         probe = ffmpeg.probe(video_path)
+#         has_video_audio = any(stream['codec_type'] == 'audio' for stream in probe['streams'])
+
+#         if audio_path:
+#             if has_video_audio:
+#                 # Mix audio gốc của video và audio mới
+#                 command += ["-map", "0:v", "-map", "[audio]", "-c:a", "aac", "-shortest"]
+#             else:
+#                 command += ["-map", "0:v", "-map", "[audio]", "-c:a", "aac"]
+#                 if audio_duration:
+#                     command += ["-t", str(audio_duration)]
+#         else:
+#             if has_video_audio:
+#                 command += ["-c:a", "aac", "-shortest"]
+#             else:
+#                 command += ["-an"]
+
+#         command += [output_path]
+
+#         print("Running command:", " ".join(command))
+#         result = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8')
+#         print("FFmpeg output:", result.stdout)
+#         print("FFmpeg error (if any):", result.stderr)
+
+#         return output_path
+#     except subprocess.CalledProcessError as e:
+#         return f"❌ FFmpeg failed: {e.stderr}"
+#     except Exception as e:
+#         import traceback
+#         return f"❌ Lỗi khác: {traceback.format_exc()}"
+
 def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_path, audio_duration, output_path, width=592, height=800):
     try:
         font_regular = "fonts/Roboto-VariableFont_wdth_wght.ttf"
@@ -193,7 +347,9 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_path, 
         inputs = [video_path]
         audio_filters = []
 
-        # Xử lý phụ đề
+        # 1. Xử lý phụ đề (ghép chữ trước)
+        drawtext_filters = []
+        current_video_stream = "[0:v]"  # Luồng video chính ban đầu
         for i, script in enumerate(scripts):
             text = script.get("text", "")
             duration = script.get("duration", 1)
@@ -244,15 +400,24 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_path, 
                 outline_width = outline.get("width", 2)
                 outline_str = f":bordercolor={outline_color}:borderw={outline_width}"
 
-            filter_complex.append(
-                f"drawtext=text='{wrapped}':fontsize={font_size}:fontcolor={font_color}:x={x}:y={y}:"
+            drawtext_filters.append(
+                f"{current_video_stream}drawtext=text='{wrapped}':fontsize={font_size}:fontcolor={font_color}:x={x}:y={y}:"
                 f"fontfile='{font_path}':box=1:boxcolor={bg_color}:boxborderw=10:line_spacing=10:"
-                f"enable='between(t,{start},{end})'{shadow_str}{outline_str}"
+                f"enable='between(t,{start},{end})'{shadow_str}{outline_str}[v{i}]"
             )
+            current_video_stream = f"[v{i}]"  # Cập nhật luồng video sau mỗi drawtext
 
-        # Xử lý nhãn dán
+        # Gộp các bộ lọc drawtext
+        if drawtext_filters:
+            filter_complex.append(";".join(drawtext_filters))
+            current_video_stream = f"[v{len(scripts)-1}]"  # Luồng video sau khi áp dụng tất cả drawtext
+        else:
+            current_video_stream = "[0:v]"
+
+        # 2. Xử lý nhãn dán (sticker sau)
         for i, sticker in enumerate(stickers):
             sticker_path = sticker.get("file_path")
+            print("Nhãn dán được thêm: ", sticker_path)
             if not os.path.exists(sticker_path):
                 return f"❌ File nhãn dán {sticker_path} không tồn tại!"
 
@@ -276,10 +441,11 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_path, 
 
             filter_complex.append(
                 f"[{input_idx}:v]{scale_filter}[sticker_{i}];"
-                f"[0:v][sticker_{i}]overlay={x}:{y}:enable='between(t,{start},{end})'"
+                f"{current_video_stream}[sticker_{i}]overlay={x}:{y}:enable='between(t,{start},{end})'[v_s{i}]"
             )
+            current_video_stream = f"[v_s{i}]"  # Cập nhật luồng video sau mỗi overlay
 
-        # Xử lý audio
+        # 3. Xử lý âm thanh (nhạc sau)
         if audio_path:
             inputs.append(audio_path)
             audio_input_idx = len(inputs) - 1
@@ -288,8 +454,10 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_path, 
             else:
                 audio_filters.append(f"[{audio_input_idx}:a]anull[audio]")
 
-        filter_complex_str = ",".join(filter_complex) if filter_complex else ""
+        # Tạo chuỗi filter_complex
+        filter_complex_str = ";".join(filter_complex) if filter_complex else ""
 
+        # Tạo lệnh FFmpeg
         command = [
             "ffmpeg",
             "-y",
@@ -299,6 +467,7 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_path, 
 
         command += [
             "-filter_complex", filter_complex_str + ";" + ";".join(audio_filters) if audio_filters else filter_complex_str,
+            "-map", f"{current_video_stream}",  # Ánh xạ luồng video cuối cùng
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
             "-crf", "20",
@@ -312,9 +481,9 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_path, 
         if audio_path:
             if has_video_audio:
                 # Mix audio gốc của video và audio mới
-                command += ["-map", "0:v", "-map", "[audio]", "-c:a", "aac", "-shortest"]
+                command += ["-map", "[audio]", "-c:a", "aac", "-shortest"]
             else:
-                command += ["-map", "0:v", "-map", "[audio]", "-c:a", "aac"]
+                command += ["-map", "[audio]", "-c:a", "aac"]
                 if audio_duration:
                     command += ["-t", str(audio_duration)]
         else:
