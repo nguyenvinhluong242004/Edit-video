@@ -4,6 +4,7 @@ import tempfile
 import json
 import numpy as np
 from PIL import Image
+from PIL import ImageFont
 import gradio as gr
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import subprocess
@@ -145,22 +146,6 @@ image_to_video_tab = gr.Interface(
 ### API 2: Text => video
 ### ============================
 
-# def wrap_text(text, max_width=1060, font_size=20):
-#     words = text.split()
-#     lines = []
-#     current_line = ""
-#     for word in words:
-#         if len(current_line + " " + word) * font_size <= max_width:
-#             current_line += " " + word
-#         else:
-#             lines.append(current_line.strip())
-#             current_line = word
-#     if current_line:
-#         lines.append(current_line.strip())
-#     return "\n".join(lines)
-
-from PIL import ImageFont
-
 def wrap_text(text, max_width, font_path, font_size=20):
     print("shdhjsadghjsgdjhsgjhd ", max_width)
     font = ImageFont.truetype(font_path, font_size)
@@ -184,160 +169,6 @@ def calculate_text_height(text, font_size=20, line_spacing=10):
     lines = text.split("\n")
     return len(lines) * font_size + (len(lines) - 1) * line_spacing
 
-# def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_path, audio_duration, output_path, width=592, height=800):
-#     try:
-#         font_regular = "fonts/Roboto-VariableFont_wdth_wght.ttf"
-#         font_bold = "fonts/Roboto_Condensed-Bold.ttf"
-#         font_bold_italic = "fonts/Roboto_Condensed-BoldItalic.ttf"
-#         filter_complex = []
-#         inputs = [video_path]
-#         audio_filters = []
-
-#         # Xử lý phụ đề
-#         for i, script in enumerate(scripts):
-#             text = script.get("text", "")
-#             duration = script.get("duration", 1)
-#             start = script.get("start", sum(s.get("duration", 0) for s in scripts[:i]))
-#             end = start + duration
-
-#             style = script.get("style", {})
-#             position = style.get("position", "bottom")
-#             font_size = style.get("fontSize", 20)
-#             font_color = style.get("fontColor", "white")
-#             bg_color = style.get("backgroundColor", "black@0.5")
-#             font_style = style.get("fontStyle", [])
-#             alignment = style.get("alignment", "center")
-#             shadow = style.get("shadow", {})
-#             outline = style.get("outline", {})
-#             width_text = style.get("width", width)
-
-#             # Chọn font
-#             if "bold" in font_style and "italic" in font_style:
-#                 font_path = font_bold_italic
-#             elif "bold" in font_style:
-#                 font_path = font_bold
-#             else:
-#                 font_path = font_regular
-
-#             wrapped = wrap_text(text, width_text, font_path, font_size)
-#             wrapped = wrapped.replace(":", "\\:").replace("'", "\\'")
-
-#             if position == "top":
-#                 y = 30
-#             elif position == "middle":
-#                 y = "(h-text_h)/2"
-#             else:  # bottom
-#                 y = "h-text_h-30"
-
-#             x = "(w-text_w)/2" if alignment == "center" else "10" if alignment == "left" else "w-text_w-10"
-
-#             shadow_str = ""
-#             if shadow:
-#                 shadow_color = shadow.get("color", "black")
-#                 shadow_x = shadow.get("offsetX", 2)
-#                 shadow_y = shadow.get("offsetY", 2)
-#                 shadow_str = f":shadowcolor={shadow_color}:shadowx={shadow_x}:shadowy={shadow_y}"
-
-#             outline_str = ""
-#             if outline:
-#                 outline_color = outline.get("color", "black")
-#                 outline_width = outline.get("width", 2)
-#                 outline_str = f":bordercolor={outline_color}:borderw={outline_width}"
-
-#             filter_complex.append(
-#                 f"drawtext=text='{wrapped}':fontsize={font_size}:fontcolor={font_color}:x={x}:y={y}:"
-#                 f"fontfile='{font_path}':box=1:boxcolor={bg_color}:boxborderw=10:line_spacing=10:"
-#                 f"enable='between(t,{start},{end})'{shadow_str}{outline_str}"
-#             )
-
-#         # Xử lý nhãn dán
-#         for i, sticker in enumerate(stickers):
-#             sticker_path = sticker.get("file_path")
-#             print("Nhãn dán được thêm: ", sticker_path)
-#             if not os.path.exists(sticker_path):
-#                 return f"❌ File nhãn dán {sticker_path} không tồn tại!"
-
-#             duration = sticker.get("duration", 1)
-#             start = sticker.get("start", sum(s.get("duration", 0) for s in stickers[:i]))
-#             end = start + duration
-#             sticker_width = sticker.get("width", 100)
-#             sticker_height = sticker.get("height", 100)
-#             position = sticker.get("position", {"x": 0, "y": 0})
-#             rotate = sticker.get("rotate", 0)
-
-#             x = position.get("x", 0)
-#             y = position.get("y", 0)
-
-#             inputs.append(sticker_path)
-#             input_idx = len(inputs) - 1
-
-#             scale_filter = f"scale={sticker_width}:{sticker_height}"
-#             if rotate:
-#                 scale_filter += f",rotate={rotate}*PI/180"
-
-#             filter_complex.append(
-#                 f"[{input_idx}:v]{scale_filter}[sticker_{i}];"
-#                 f"[0:v][sticker_{i}]overlay={x}:{y}:enable='between(t,{start},{end})'"
-#             )
-
-#         # Xử lý audio
-#         if audio_path:
-#             inputs.append(audio_path)
-#             audio_input_idx = len(inputs) - 1
-#             if audio_duration:
-#                 audio_filters.append(f"[{audio_input_idx}:a]atrim=duration={audio_duration}[audio]")
-#             else:
-#                 audio_filters.append(f"[{audio_input_idx}:a]anull[audio]")
-
-#         filter_complex_str = ",".join(filter_complex) if filter_complex else ""
-
-#         command = [
-#             "ffmpeg",
-#             "-y",
-#         ]
-#         for input_file in inputs:
-#             command += ["-i", input_file]
-
-#         command += [
-#             "-filter_complex", filter_complex_str + ";" + ";".join(audio_filters) if audio_filters else filter_complex_str,
-#             "-c:v", "libx264",
-#             "-pix_fmt", "yuv420p",
-#             "-crf", "20",
-#             "-preset", "veryfast",
-#         ]
-
-#         # Xử lý audio output
-#         probe = ffmpeg.probe(video_path)
-#         has_video_audio = any(stream['codec_type'] == 'audio' for stream in probe['streams'])
-
-#         if audio_path:
-#             if has_video_audio:
-#                 # Mix audio gốc của video và audio mới
-#                 command += ["-map", "0:v", "-map", "[audio]", "-c:a", "aac", "-shortest"]
-#             else:
-#                 command += ["-map", "0:v", "-map", "[audio]", "-c:a", "aac"]
-#                 if audio_duration:
-#                     command += ["-t", str(audio_duration)]
-#         else:
-#             if has_video_audio:
-#                 command += ["-c:a", "aac", "-shortest"]
-#             else:
-#                 command += ["-an"]
-
-#         command += [output_path]
-
-#         print("Running command:", " ".join(command))
-#         result = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8')
-#         print("FFmpeg output:", result.stdout)
-#         print("FFmpeg error (if any):", result.stderr)
-
-#         return output_path
-#     except subprocess.CalledProcessError as e:
-#         return f"❌ FFmpeg failed: {e.stderr}"
-#     except Exception as e:
-#         import traceback
-#         return f"❌ Lỗi khác: {traceback.format_exc()}"
-
 def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_configs, output_path, width=592, height=800):
     try:
         font_regular = "fonts/Roboto-VariableFont_wdth_wght.ttf"
@@ -346,8 +177,9 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_config
         filter_complex = []
         inputs = [video_path]
         audio_filters = []
+        audio_inputs = []
 
-        # 1. Process subtitles
+        # Xử lý phụ đề
         drawtext_filters = []
         current_video_stream = "[0:v]"
         for i, script in enumerate(scripts):
@@ -401,12 +233,11 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_config
         else:
             current_video_stream = "[0:v]"
 
-        # 2. Process stickers
+        # Xử lý nhãn dán
         for i, sticker in enumerate(stickers):
             sticker_path = sticker.get("file_path")
-            print("Adding sticker:", sticker_path)
             if not os.path.exists(sticker_path):
-                return f"❌ Sticker file {sticker_path} does not exist!"
+                return f"❌ Tệp nhãn dán {sticker_path} không tồn tại!"
 
             duration = sticker.get("duration", 1)
             start = sticker.get("start", sum(s.get("duration", 0) for s in stickers[:i]))
@@ -432,25 +263,36 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_config
             )
             current_video_stream = f"[v_s{i}]"
 
-        # 3. Process audio
+        # Xử lý âm thanh
         probe = ffmpeg.probe(video_path)
         has_video_audio = any(stream['codec_type'] == 'audio' for stream in probe['streams'])
-        video_duration = float(probe['format']['duration'])  # Get video duration
-        audio_inputs = []
+        video_duration = float(probe['format']['duration'])
 
         if audio_configs:
             for i, audio in enumerate(audio_configs):
                 audio_path = audio.get("file_path")
                 if not audio_path or not os.path.exists(audio_path):
-                    return f"❌ Audio file {audio_path} does not exist!"
+                    return f"❌ Tệp âm thanh {audio_path} không tồn tại!"
+                
+                try:
+                    audio_probe = ffmpeg.probe(audio_path)
+                    if not any(stream['codec_type'] == 'audio' for stream in audio_probe['streams']):
+                        return f"❌ Tệp {audio_path} không phải tệp âm thanh hợp lệ!"
+                    audio_duration = float(audio_probe['format']['duration'])
+                except ffmpeg.Error as e:
+                    return f"❌ Lỗi khi kiểm tra tệp âm thanh {audio_path}: {e.stderr.decode('utf-8')}"
+
+                start = audio.get("start", 0)
+                end = audio.get("end", start + 1)
+                volume = audio.get("volume", 1.0)
+
+                if start < 0 or end <= start:
+                    return f"❌ Cấu hình âm thanh {i+1} có thời gian không hợp lệ: start={start}, end={end}"
+                if end - start > audio_duration:
+                    return f"❌ Cấu hình âm thanh {i+1} yêu cầu cắt vượt quá độ dài tệp: {end - start}s > {audio_duration}s"
 
                 inputs.append(audio_path)
                 audio_input_idx = len(inputs) - 1
-                start = audio.get("start", 0)
-                end = audio.get("end", start + 1)  # Default to 1 second if end not specified
-                volume = audio.get("volume", 1.0)
-
-                # Trim audio and add delay to align with start time
                 audio_filters.append(
                     f"[{audio_input_idx}:a]atrim=0:{end-start},adelay={int(start*1000)}|{(int(start*1000))},volume={volume}[audio_{i}]"
                 )
@@ -459,60 +301,59 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_config
         # Mix audio
         if audio_inputs:
             if has_video_audio:
-                # Mix original video audio with background audios, pad to video duration
-                audio_filters.append(
-                    f"[0:a]{';'.join(audio_inputs)}amix=inputs={1 + len(audio_inputs)}[mixed];[mixed]apad=pad_dur={video_duration}[audio]"
-                )
-            else:
-                # Mix only background audios, pad to video duration
-                audio_filters.append(
-                    f"{';'.join(audio_inputs)}amix=inputs={len(audio_inputs)}[mixed];[mixed]apad=pad_dur={video_duration}[audio]"
-                )
+                # Thêm luồng âm thanh gốc vào danh sách audio_inputs
+                audio_filters.append("[0:a]volume=1.0[original_audio]")
+                audio_inputs.append("[original_audio]")
+            # Trộn tất cả các luồng âm thanh (gốc + mới)
+            audio_filters.append(
+                f"{' '.join(audio_inputs)}amix=inputs={len(audio_inputs)}[mixed];[mixed]apad=pad_dur={video_duration}[audio]"
+            )
         elif has_video_audio:
             audio_filters.append("[0:a]anull[audio]")
         else:
-            # If no audio, create a silent track for the full video duration
             audio_filters.append(f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={video_duration}[audio]")
 
-        # Create filter_complex string
-        filter_complex_str = ";".join(filter_complex) if filter_complex else ""
+        # Tạo filter_complex
+        filter_complex_parts = []
+        if filter_complex:
+            filter_complex_parts.append(";".join(filter_complex))
+        if audio_filters:
+            filter_complex_parts.append(";".join(audio_filters))
 
-        # Build FFmpeg command
+        filter_complex_str = ";".join(filter_complex_parts) if filter_complex_parts else ""
+
+        # Xây dựng lệnh FFmpeg
         command = ["ffmpeg", "-y"]
         for input_file in inputs:
             command += ["-i", input_file]
 
         command += [
-            "-filter_complex", filter_complex_str + ";" + ";".join(audio_filters) if audio_filters else filter_complex_str,
+            "-filter_complex", filter_complex_str,
             "-map", f"{current_video_stream}",
+            "-map", "[audio]",
             "-c:v", "libx264",
+            "-c:a", "aac",
             "-pix_fmt", "yuv420p",
             "-crf", "20",
             "-preset", "veryfast",
+            "-t", str(video_duration),
+            output_path
         ]
 
-        # Audio output
-        if audio_inputs or has_video_audio:
-            command += ["-map", "[audio]", "-c:a", "aac"]
-        else:
-            command += ["-map", "[audio]", "-c:a", "aac"]
+        print("Danh sách tệp âm thanh:", [audio.get("file_path") for audio in audio_configs])
+        print("Cấu hình âm thanh:", audio_configs)
+        print("Lệnh FFmpeg:", " ".join(command))
 
-        # Set output duration to match video duration
-        command += ["-t", str(video_duration)]
-
-        command += [output_path]
-
-        print("Running command:", " ".join(command))
         result = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8')
         print("FFmpeg output:", result.stdout)
         print("FFmpeg error (if any):", result.stderr)
 
         return output_path
     except subprocess.CalledProcessError as e:
-        return f"❌ FFmpeg failed: {e.stderr}"
+        return f"❌ FFmpeg thất bại: {e.stderr}"
     except Exception as e:
         import traceback
-        return f"❌ Other error: {traceback.format_exc()}"
+        return f"❌ Lỗi khác: {traceback.format_exc()}"
     
 def generate_video_2(video_file, script_input, sticker_files, sticker_config, audio_files, audio_config):
     try:
