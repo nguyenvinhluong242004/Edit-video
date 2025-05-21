@@ -184,10 +184,8 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_config
         current_video_stream = "[0:v]"
         for i, script in enumerate(scripts):
             text = script.get("text", "")
-            duration = script.get("duration", 1)
-            start = script.get("start", sum(s.get("duration", 0) for s in scripts[:i]))
-            end = start + duration
-
+            start = script.get("start", 0)  # Thay duration bằng start
+            end = script.get("end", 1)      # Thêm end
             style = script.get("style", {})
             position = style.get("position", "bottom")
             font_size = style.get("fontSize", 20)
@@ -239,9 +237,8 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_config
             if not os.path.exists(sticker_path):
                 return f"❌ Tệp nhãn dán {sticker_path} không tồn tại!"
 
-            duration = sticker.get("duration", 1)
-            start = sticker.get("start", sum(s.get("duration", 0) for s in stickers[:i]))
-            end = start + duration
+            start = sticker.get("start", 0)  # Thay duration bằng start
+            end = sticker.get("end", 1)      # Thêm end
             sticker_width = sticker.get("width", 100)
             sticker_height = sticker.get("height", 100)
             position = sticker.get("position", {"x": 0, "y": 0})
@@ -263,7 +260,7 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_config
             )
             current_video_stream = f"[v_s{i}]"
 
-        # Xử lý âm thanh
+        # Xử lý âm thanh (không thay đổi)
         probe = ffmpeg.probe(video_path)
         has_video_audio = any(stream['codec_type'] == 'audio' for stream in probe['streams'])
         video_duration = float(probe['format']['duration'])
@@ -301,10 +298,8 @@ def overlay_subtitles_stickers_audio(video_path, scripts, stickers, audio_config
         # Mix audio
         if audio_inputs:
             if has_video_audio:
-                # Thêm luồng âm thanh gốc vào danh sách audio_inputs
                 audio_filters.append("[0:a]volume=1.0[original_audio]")
                 audio_inputs.append("[original_audio]")
-            # Trộn tất cả các luồng âm thanh (gốc + mới)
             audio_filters.append(
                 f"{' '.join(audio_inputs)}amix=inputs={len(audio_inputs)}[mixed];[mixed]apad=pad_dur={video_duration}[audio]"
             )
@@ -411,7 +406,7 @@ text_to_video_tab = gr.Interface(
         gr.File(file_types=["video"], label="Video chính"),
         gr.Textbox(
             label="Scripts",
-            placeholder='[{"text": "Xin chào", "duration": 3, "style": {"position": "bottom", "fontSize": 20, "fontColor": "white", "backgroundColor": "black@0.5", "fontStyle": ["bold"], "alignment": "center", "shadow": {"color": "black", "offsetX": 2, "offsetY": 2}, "outline": {"color": "red", "width": 2}}}]'
+            placeholder='[{"text": "Xin chào", "start": 0, "end": 3, "style": {"position": "bottom", "fontSize": 20, "fontColor": "white", "backgroundColor": "black@0.5", "fontStyle": ["bold"], "alignment": "center", "shadow": {"color": "black", "offsetX": 2, "offsetY": 2}, "outline": {"color": "red", "width": 2}}}]'
         ),
         gr.File(
             file_types=["image"],
@@ -420,7 +415,7 @@ text_to_video_tab = gr.Interface(
         ),
         gr.Textbox(
             label="Cấu hình nhãn dán",
-            placeholder='[{"duration": 3, "start": 0, "width": 100, "height": 100, "position": {"x": 50, "y": 50}, "rotate": 45}]'
+            placeholder='[{"start": 0, "end": 3, "width": 100, "height": 100, "position": {"x": 50, "y": 50}, "rotate": 45}]'
         ),
         gr.File(
             file_types=["audio"],
